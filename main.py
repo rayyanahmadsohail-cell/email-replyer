@@ -1,99 +1,89 @@
 import os
-from crewai import Agent, Task, Crew, LLM
+from crewai import Agent, Task, Crew, Process, LLM
 from crewai_tools import ScrapeWebsiteTool
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
-
-gemini_llm = LLM(
-    model="gemini-2.5-flash", 
-    api_key=os.getenv("GOOGLE_API_KEY")
+llm = LLM(
+    model="groq/llama-3.3-70b-versatile",
+    api_key="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"
 )
 
-
 agency_services = """
-SEO Optimization Service
-Target: Companies with good products/services but low website traffic
-Goal: Increase organic reach, improve search engine rankings
-
-Custom Web Development
-Target: Companies with outdated, slow, or unattractive websites
-Goal: Build modern websites using React or Python
-
-AI Automation
-Target: Companies with manual, repetitive processes
-Goal: Build AI agents to automate tasks and save time
+1. SEO Optimization Service: Best for companies with good products but low traffic. We increase organic reach.
+2. Custom Web Development: Best for companies with outdated, ugly, or slow websites. We build modern React/Python sites.
+3. AI Automation: Best for companies with manual, repetitive tasks. We build agents to save time.
 """
-
 
 scrape_tool = ScrapeWebsiteTool()
 
-
 researcher = Agent(
-    role="Market Researcher",
-    goal="Analyze the target market website and identify their core market and potential weaknesses.",
-    backstory="You are an expert at analyzing companies by reviewing their websites.",
+    role='Business Intelligence Analyst',
+    goal='Analyze the target company website and identify their core business and potential weaknesses.',
+    backstory="You are an expert at analyzing businesses just by looking at their landing page. You look for what they do and where they might be struggling.",
     tools=[scrape_tool],
     verbose=True,
+    allow_delegation=True,
     memory=True,
-    llm=gemini_llm
+    llm=llm
 )
 
 strategist = Agent(
-    role="Agency Strategist",
-    goal="Match the target market company needs with ONE of our agency services.",
-    backstory=f"""You work for a top-tier digital agency. You must choose ONE best service from our offerings.
+    role='Agency Strategist',
+    goal='Match the target company needs with ONE of our agency services.',
+    backstory=f"""You work for a top-tier digital agency.
+    Your goal is to read the analysis of a prospect and decide which of OUR services to pitch.
 
-OUR SERVICES:
-{agency_services}
-""",
+    OUR SERVICES KNOWLEDGE BASE:
+    {agency_services}
+
+    You must pick the SINGLE best service for this specific client and explain why.""",
     verbose=True,
     memory=True,
-    llm=gemini_llm
+    llm=llm
 )
 
 writer = Agent(
-    role="Senior Sales Copywriter",
-    goal="Write a personalized cold email that sounds human and professional.cold email should be easy to read even for kids",
-    backstory="You write high-converting cold emails that feel personal and natural.",
+    role='Senior Sales Copywriter',
+    goal='Write a personalized cold email that sounds human and professional.',
+    backstory="""You write emails that get replies. You never sound robotic.
+    You mention specific details found by the Researcher to prove we actually looked at their site.""",
     verbose=True,
-    llm=gemini_llm
+    llm=llm
 )
-
 
 target_url = "https://openai.com/"
 
 task_analyze = Task(
-    description=f"""
-Scrape the website {target_url}. Summarize what the company does and identify ONE key improvement area.
-""",
-    expected_output="Company summary and one clear pain point.",
+    description=f"Scrape the website {target_url}. Summarize what the company does and identify 1 key area where they could improve (e.g., design, traffic, automation).",
+    expected_output="A brief summary of the company and their potential pain points.",
     agent=researcher
 )
 
 task_strategize = Task(
-    description="""Based on the research, select ONE agency service that best fits the company. Explain why.""",
-    expected_output="Chosen service with reasoning.",
+    description="Based on the analysis, pick ONE service from our Agency Knowledge Base that solves their problem. Explain the match.",
+    expected_output="The selected service and the reasoning for the match.",
     agent=strategist
 )
 
 task_write = Task(
-    description="""Write a cold email to the CEO. Pitch the chosen service. Keep it under 150 words.""",
-    expected_output="A ready-to-send cold email that is easy to read even for kids.",
+    description="Draft a cold email to the CEO of the target company. Pitch the selected service. Keep it under 150 words.",
+    expected_output="A professional cold email ready to send.",
     agent=writer
 )
-
 
 sales_crew = Crew(
     agents=[researcher, strategist, writer],
     tasks=[task_analyze, task_strategize, task_write],
+    process=Process.sequential,
     verbose=True
 )
 
-print("STARTING SALES RESEARCH AGENT")
+print("### STARTING SALES RESEARCH AGENT ###")
 result = sales_crew.kickoff()
 
-print("\nFINAL EMAIL DRAFT\n")
+print("\n\n########################")
+print("## FINAL EMAIL DRAFT ##")
+print("########################\n")
 print(result)
